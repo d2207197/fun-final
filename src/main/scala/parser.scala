@@ -1,7 +1,8 @@
 package nlplab
 
 
-case class LinggleQuery(terms: Vector[String] , length: Int , positions: Vector[Int], filters: Vector[Tuple2[Int, String]]) {
+case class LinggleQuery(terms: Vector[String] , length: Int , positions: Vector[Int], filters: Vector[Tuple2[Int, String]])
+{
   override def toString = "LQ(ts: \"%s\", l: %d, ps: %s, fs: [%s])" format
   (terms.mkString(" "), length, positions.mkString(""), filters.mkString(", "))
 }
@@ -16,7 +17,7 @@ object LinggleQuery {
   case class Or(terms: List[NonWildCard]) extends HereAtom {
     override def toString = terms.mkString("Or(", ", ", ")")
   }
-  case object WildCard extends HereAtom 
+  case object WildCard extends HereAtom
   trait NonWildCard extends HereAtom
 
   case class POS(pos: String) extends NonWildCard
@@ -28,21 +29,20 @@ object LinggleQuery {
 
   import scala.util.parsing.combinator._
 
-
   object QueryParser extends JavaTokenParsers {
-    def wildCard  = "_".r ^^^ { WildCard}
-    def anyWildCard = "*" ^^^ { AnyWildCard}
+    val wildCard  = "_".r ^^^ { WildCard}
+    val anyWildCard = "*" ^^^ { AnyWildCard}
 
-    def term = raw"""[a-zA-Z0-9'.]+""".r ^^ {Term(_)}
-    def partOfSpeech = ("adj." | "n." | "v." | "prep." | "det." |  "adv.") ^^ { POS(_)}
+    val term = raw"""[a-zA-Z0-9'.]+""".r ^^ {Term(_)}
+    val partOfSpeech = ("adj." | "n." | "v." | "prep." | "det." |  "adv.") ^^ { POS(_)}
 
-    def nonWildCard = partOfSpeech | term 
-    def or = (nonWildCard <~ "|") ~ rep1sep(nonWildCard, raw"|")  ^^ { case t~ts => Or(t :: ts) }
-    def hereAtom = wildCard | or | nonWildCard
-    def maybe = "?" ~> hereAtom ^^ { Maybe(_) }
+    val nonWildCard = partOfSpeech | term
+    val or = (nonWildCard <~ "|") ~ rep1sep(nonWildCard, raw"|")  ^^ { case t~ts => Or(t :: ts) }
+    val hereAtom = wildCard | or | nonWildCard
+    val maybe = "?" ~> hereAtom ^^ { Maybe(_) }
 
-    def atom: Parser[Atom] = anyWildCard | maybe | hereAtom
-    def expr: Parser[List[Atom]] = rep(atom) 
+    val atom: Parser[Atom] = anyWildCard | maybe | hereAtom
+    val expr: Parser[List[Atom]] = rep(atom) 
     def parse(userQuery : String) = parseAll(expr, userQuery)
   }
 
@@ -80,14 +80,17 @@ object LinggleQuery {
         LinggleQuery(ts, l, ps, fs) <- queries
         newL <- l to 5
       } yield LinggleQuery(ts, newL, ps, fs)
-    } 
+    }
 
   def parse(userQuery: String) = 
-    QueryParser.parse(userQuery) map {
-      _.foldLeft(List[LinggleQuery](LinggleQuery(Vector(), 0, Vector(), Vector()))) (handleAtom(_,_)) filter {case LinggleQuery(ts, l, ps, fs) => ts.size > 0}
-    } 
+    QueryParser.parse(userQuery) map { atoms =>
+      (atoms.foldLeft
+        (List[LinggleQuery](LinggleQuery(Vector(), 0, Vector(), Vector())))
+        (handleAtom(_,_)) 
+        filter {case LinggleQuery(ts, l, ps, fs) => ts.size > 0})
+    }
 
-// def escape(raw: String): String = {
+  // def escape(raw: String): String = {
   // import compat._ 
   // import c.universe._
   // Literal(Constant(raw)).toString
@@ -95,6 +98,7 @@ object LinggleQuery {
 
   def queryDemo(query: String) = {
     import scala.io.AnsiColor._
+    println(QueryParser.parse(query).get)
       println(
         s"""query:$query
          |%s
@@ -102,7 +106,6 @@ object LinggleQuery {
     }
 
   def main(args: Array[String]) {
-
     queryDemo("a b c")
   }
 
