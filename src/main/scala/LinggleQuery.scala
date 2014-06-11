@@ -1,4 +1,4 @@
-package nlplab
+package cc.nlplab
 
 
 case class LinggleQuery(terms: Vector[String] , length: Int , positions: Vector[Int], filters: Vector[Tuple2[Int, String]])
@@ -89,12 +89,6 @@ object LinggleQuery {
         (handleAtom(_,_)) 
         filter {case LinggleQuery(ts, l, ps, fs) => ts.size > 0})
     }
-
-  // def escape(raw: String): String = {
-  // import compat._ 
-  // import c.universe._
-  // Literal(Constant(raw)).toString
-  // }
 
   def queryDemo(query: String) = {
     import scala.io.AnsiColor._
