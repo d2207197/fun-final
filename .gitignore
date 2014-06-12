@@ -1,0 +1,13 @@
+/.ensime
+/.ensime_lucene/
+/.ipynb_checkpoints/
+/bncwordlemma.pick
+/hbase-site.xml
+/index/
+/ipynb/.ipynb_checkpoints/
+/lib/
+/nlplab/
+/package.html
+/target/
+/index.js
+/index.html
