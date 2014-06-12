@@ -63,11 +63,9 @@ object HbasePutNgram {
   }
 
   def toNgramPuts(ngram: Vector[String], count: Int, unigramMap: UnigramMap): Iterator[Put] =  {
-    // println(ngram)
+
     val selectors = (List.range(0, ngram.length).toSet.subsets drop 1)
     selectors map { sel =>
-      // println(sel)
-      // println(toRowKey(ngram, count, sel, unigramMap).mkString("Array[Byte](", ", ", ")"))
       val rowKey = toRowKey(ngram, count, sel, unigramMap)
       val column = s"${ngram.length}-${sel.mkString}".getBytes
       val value = (ngram.mkString(" ") + "\t" + count.toString).getBytes
@@ -90,11 +88,6 @@ object HbasePutNgram {
 
     new HTable(config, hbaseTblName)
   }
-
-  // def recursiveListFiles(f: File): Array[File] = {
-  //   val these = f.listFiles
-  //   these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
-  // }
 
   def main(args: Array[String]) {
 
