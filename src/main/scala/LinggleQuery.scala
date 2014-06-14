@@ -1,6 +1,17 @@
 package cc.nlplab
 
 
+
+import org.apache.hadoop.hbase.{HBaseConfiguration, HTableDescriptor, HColumnDescriptor}
+import org.apache.hadoop.hbase.client.{HBaseAdmin,HTable,Put,Get,Scan,ResultScanner,Result}
+import org.apache.hadoop.conf.Configuration
+import java.io.FileInputStream
+
+import org.apache.hadoop.hbase.util.{Bytes, Writables}
+
+
+
+
 case class LinggleQuery(terms: Vector[String] , length: Int , positions: Vector[Int], filters: Vector[Tuple2[Int, String]])
 {
   override def toString = "LQ(ts: \"%s\", l: %d, ps: %s, fs: [%s])" format
@@ -102,7 +113,91 @@ object LinggleQuery {
   def main(args: Array[String]) {
     queryDemo("a b c")
   }
-
-
 }
+
+
+
+
+
+class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) {
+  implicit object CountOrdering extends scala.math.Ordering[Row] {
+  def compare(a: Row, b: Row) = a.count compare b.count
+}
+case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] ) 
+
+  val unigramMap = UnigramMap(unigramMapJson)
+  val hTable = hTableConnect(hBaseConfFileName, table)
+
+  def hTableConnect(hBaseConfFileName: String, table: String):HTable = {
+    val conf = new Configuration
+    conf.addResource(new FileInputStream(hBaseConfFileName))
+    val config = HBaseConfiguration.create(conf)
+    new HTable(config, table)
+  }
+
+  // def merge(ss: Vector[Stream[Row]]): Stream[Row] =
+  //   ss map {case (s #:: ssTail) }
+
+  //   }
+
+  //   (ls, rs) match {
+  //   case (Stream.Empty, _) => rs
+  //   case (_, Stream.Empty) => ls
+  //   case (l #:: ls1, r #:: rs1) =>
+  //     if (l > r) l #:: merge(ls1, rs)
+  //     else r #:: merge(ls, rs1)
+  // }
+
+  def toHex(buf: Array[Byte]): String =
+    buf.map("\\%02X" format _).mkString
+
+  def scan(linggleQuery: LinggleQuery): Stream[Row] = {
+
+    val LinggleQuery(terms, length, positions, filters) = linggleQuery
+    val column = s"${length}-${positions.mkString}"
+    val columnBytes = column.getBytes
+    val startRow = (terms
+      map (t => Bytes.toBytes(unigramMap(t)))) reduce {_++_}
+    val stopRow: Array[Byte] = startRow.init :+ (startRow.last + 1).toByte
+    println(linggleQuery)
+    println(toHex(startRow), toHex(stopRow), column)
+    
+    val scan = new Scan(startRow, stopRow)
+    scan.addColumn("sel".getBytes, columnBytes)
+    // scan.addFamily
+    val scanner = hTable.getScanner(scan)
+
+    def resultToRow(result: Result): Row ={
+      val value = new String(result.getValue("sel".getBytes, columnBytes))
+      val Array(_ngram, _count) = value.split("\t")
+      val count = _count.toInt
+      val ngram = _ngram.split(" ").toVector
+      Row(ngram, count, positions)
+    }
+      
+
+    def scanToStream(scanner: ResultScanner): Stream[Row] =
+      (scanner.next(100) map resultToRow).toStream #::: scanToStream(scanner)
+
+    scanToStream(scanner)
+    // scanner.next(10) map resultToRow
+  }
+
+  def query(q: String): Stream[Row] = {
+    val lqs: List[LinggleQuery] = LinggleQuery.parse(q).get
+    ((lqs map {scan(_)}) reduce (_#:::_)).sorted
+  }
+}
+
+
+
+object Tester {
+  def linggle = {
+    println(LinggleQuery.parse("kill the * ").get)
+
+    val lgl =new Linggle("hbase-site.xml", "web1t-linggle", "web1t_unigrams_300000up.json")
+    lgl.scan(LinggleQuery.parse("kill the *").get.head).take(100).toList
+  }
+}
+
 
