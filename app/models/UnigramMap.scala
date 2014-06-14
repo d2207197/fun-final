@@ -20,3 +20,22 @@ object UnigramMap {
     new UnigramMap(_to, _from)
   }
 }
+
+class POS(posMap: Map[String, Vector[String]]) {
+  def apply(unigram: String) = posMap(unigram)
+  def apply(unigram: String, pos: String) =
+    if (posMap contains unigram)
+      posMap(unigram) contains pos
+    else false
+}
+
+
+
+object POS {
+  def apply(jsonPath: String) = {
+    val mapper = new ObjectMapper() with ScalaObjectMapper
+    mapper.registerModule(DefaultScalaModule)
+    val posMap:Map[String, Vector[String]] =  mapper.readValue[Map[String,Vector[String]]](new java.io.File (jsonPath))
+    new POS(posMap)
+  }
+}
