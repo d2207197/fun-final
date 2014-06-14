@@ -117,13 +117,14 @@ object LinggleQuery {
 
 
 
+  case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
 
 
 class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) {
   implicit object CountOrdering extends scala.math.Ordering[Row] {
   def compare(a: Row, b: Row) = - (a.count compare b.count)
 }
-case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] ) 
+  val posMap =  POS("bncwordlemma.json")
 
   val unigramMap = UnigramMap(unigramMapJson)
   val hTable = hTableConnect(hBaseConfFileName, table)
@@ -151,7 +152,7 @@ case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
   def toHex(buf: Array[Byte]): String =
     buf.map("\\%02X" format _).mkString
 
-  def scan(linggleQuery: LinggleQuery): Stream[Row] = {
+  def scan(linggleQuery: LinggleQuery): List[Row] = {
 
     val LinggleQuery(terms, length, positions, filters) = linggleQuery
     val column = s"${length}-${positions.mkString}"
@@ -175,18 +176,26 @@ case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
       Row(ngram, count, positions)
     }
       
-
-
     // def scanToStream(scanner: ResultScanner): Stream[Row] =
       // (scanner.next(100) map resultToRow).toStream #::: scanToStream(scanner)
 
     // scanToStream(scanner) take 100
-    (scanner.next(100) map resultToRow ).toStream
+    (scanner.next(100) map resultToRow ).toList
+  }
+  
+  def rowFilter(lq: LinggleQuery)(row :Row) : Boolean = {
+    val posTagTrans = Map( "n." -> "n", "v." -> "v", "det." -> "d", "prep." -> "p", "adj." -> "a")
+    lq.filters forall { case (position, posTag) => posMap(row.ngram(position), posTagTrans(posTag)) } 
   }
 
-  def query(q: String): Stream[Row] = {
+  def query(q: String): List[Row] = {
     val lqs: List[LinggleQuery] = LinggleQuery.parse(q).get
-    ((lqs map {scan(_) take 100} ) reduce (_#:::_)).sorted
+    val rows = for {
+      lq <- lqs
+      row <- scan(lq)
+      if rowFilter(lq)(row)
+    } yield row
+    rows.sorted
   }
 }
 
@@ -201,5 +210,7 @@ object Tester {
     (lgl.query("kill the *") take 100).toList
   }
 }
+
+
 
 
