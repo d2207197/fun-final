@@ -121,7 +121,7 @@ object LinggleQuery {
 
 class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) {
   implicit object CountOrdering extends scala.math.Ordering[Row] {
-  def compare(a: Row, b: Row) = a.count compare b.count
+  def compare(a: Row, b: Row) = - (a.count compare b.count)
 }
 case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] ) 
 
@@ -176,16 +176,17 @@ case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
     }
       
 
-    def scanToStream(scanner: ResultScanner): Stream[Row] =
-      (scanner.next(100) map resultToRow).toStream #::: scanToStream(scanner)
 
-    scanToStream(scanner)
-    // scanner.next(10) map resultToRow
+    // def scanToStream(scanner: ResultScanner): Stream[Row] =
+      // (scanner.next(100) map resultToRow).toStream #::: scanToStream(scanner)
+
+    // scanToStream(scanner) take 100
+    (scanner.next(100) map resultToRow ).toStream
   }
 
   def query(q: String): Stream[Row] = {
     val lqs: List[LinggleQuery] = LinggleQuery.parse(q).get
-    ((lqs map {scan(_)}) reduce (_#:::_)).sorted
+    ((lqs map {scan(_) take 100} ) reduce (_#:::_)).sorted
   }
 }
 
@@ -193,10 +194,11 @@ case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
 
 object Tester {
   def linggle = {
-    println(LinggleQuery.parse("kill the * ").get)
+    println(LinggleQuery.parse("kill the * ").get.head)
 
     val lgl =new Linggle("hbase-site.xml", "web1t-linggle", "web1t_unigrams_300000up.json")
-    lgl.scan(LinggleQuery.parse("kill the *").get.head).take(100).toList
+
+    (lgl.query("kill the *") take 100).toList
   }
 }
 
