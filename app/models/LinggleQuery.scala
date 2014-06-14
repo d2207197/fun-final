@@ -152,7 +152,7 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
   def toHex(buf: Array[Byte]): String =
     buf.map("\\%02X" format _).mkString
 
-  def scan(linggleQuery: LinggleQuery): List[Row] = {
+  def buildScanner(linggleQuery: LinggleQuery): ResultScanner = {
 
     val LinggleQuery(terms, length, positions, filters) = linggleQuery
     val column = s"${length}-${positions.mkString}"
@@ -166,7 +166,16 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
     val scan = new Scan(startRow, stopRow)
     scan.addColumn("sel".getBytes, columnBytes)
     // scan.addFamily
-    val scanner = hTable.getScanner(scan)
+    hTable.getScanner(scan)
+  }
+
+  def scan(linggleQuery: LinggleQuery): Stream[Row] = {
+    println(s"scan: $linggleQuery")
+    val LinggleQuery(terms, length, positions, filters) = linggleQuery
+    val column = s"${length}-${positions.mkString}"
+    val columnBytes = column.getBytes
+
+    val scanner =  buildScanner(linggleQuery)
 
     def resultToRow(result: Result): Row ={
       val value = new String(result.getValue("sel".getBytes, columnBytes))
@@ -176,11 +185,16 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
       Row(ngram, count, positions)
     }
       
-    // def scanToStream(scanner: ResultScanner): Stream[Row] =
-      // (scanner.next(100) map resultToRow).toStream #::: scanToStream(scanner)
+    def scanToStream(scanner: ResultScanner): Stream[Row] = {
+      val rows = (scanner.next(10) map resultToRow)
+      if (rows.size < 10) 
+        rows.toStream
+      else
+        rows.toStream #::: scanToStream(scanner)
+    }
 
-    // scanToStream(scanner) take 100
-    (scanner.next(100) map resultToRow ).toList
+    scanToStream(scanner) 
+    // (scanner.next(100) map resultToRow ).toList
   }
   
   def rowFilter(lq: LinggleQuery)(row :Row) : Boolean = {
@@ -192,10 +206,10 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
     val lqs: List[LinggleQuery] = LinggleQuery.parse(q).get
     val rows = for {
       lq <- lqs
-      row <- scan(lq)
+      row <- scan(lq) take 100
       if rowFilter(lq)(row)
     } yield row
-    rows.sorted
+    rows.sorted.toList
   }
 }
 

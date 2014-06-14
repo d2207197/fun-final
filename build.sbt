@@ -4,6 +4,8 @@ name := """linggle"""
 
 version := "1.0-SNAPSHOT"
 
+organization := "nlplab"
+
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 scalaVersion := "2.11.1"

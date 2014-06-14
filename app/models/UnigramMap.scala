@@ -29,8 +29,6 @@ class POS(posMap: Map[String, Vector[String]]) {
     else false
 }
 
-
-
 object POS {
   def apply(jsonPath: String) = {
     val mapper = new ObjectMapper() with ScalaObjectMapper
