@@ -1,13 +1,19 @@
 import AssemblyKeys._ // put this at the top of the file
 
+name := """linggle"""
 
-organization := "cc.nlplab"
+version := "1.0-SNAPSHOT"
 
-name := "linggle"
-
-version := "0.2-SNAPSHOT"
+lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 scalaVersion := "2.11.1"
+
+libraryDependencies ++= Seq(
+  jdbc,
+  anorm,
+  cache,
+  ws
+)
 
 resolvers += "Maven Central Server" at "http://repo1.maven.org/maven2"
 
@@ -48,5 +54,3 @@ mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
     case x => old(x)
   }
 }
-
-
