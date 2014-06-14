@@ -359,8 +359,7 @@ function fetch_worker(server, query)
 {
 	$('#cluster-toggle').hide(0);
 	var request = $.ajax({
-		//url: server + query,
-		url: 'static/query',
+		url: server + query,
 		// url: 'static/A_beach.json',
 		// url: "static/cultivate_N_new.json",
 		type: "GET",
