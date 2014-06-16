@@ -14,7 +14,7 @@ object Application extends Controller {
   def query(q: String) = Action {
     val lgl =new Linggle("hbase-site.xml", "web1t-linggle", "web1t_unigrams_300000up.json")
 
-    var result =lgl.query(q)
+    var result =lgl.query(q) 
     var s = (for(r <- result) yield r.count).sum
     val df = new java.text.DecimalFormat()
     var rows = for(r <- result) yield Json.toJson(Map(
@@ -26,6 +26,4 @@ object Application extends Controller {
     var json = Json.toJson(Seq(Json.toJson(Seq(Json.toJson("old"),Json.toJson(rows)))))
     Ok(json)
   }
-
-
 }

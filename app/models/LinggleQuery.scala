@@ -9,7 +9,7 @@ import java.io.FileInputStream
 
 import org.apache.hadoop.hbase.util.{Bytes, Writables}
 
-
+import org.apache.hadoop.hbase.filter.PageFilter
 
 
 case class LinggleQuery(terms: Vector[String] , length: Int , positions: Vector[Int], filters: Vector[Tuple2[Int, String]])
@@ -116,17 +116,16 @@ object LinggleQuery {
 }
 
 
-
-  case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
-
+case class Row(ngram: Vector[String], count: Int, positions: Vector[Int] )
 
 class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) {
-  implicit object CountOrdering extends scala.math.Ordering[Row] {
-  def compare(a: Row, b: Row) = - (a.count compare b.count)
-}
-  val posMap =  POS("bncwordlemma.json")
 
+  implicit object CountOrdering extends scala.math.Ordering[Row] {
+    def compare(a: Row, b: Row) = - (a.count compare b.count)
+  }
+  val posMap =  POS("bncwordlemma.json")
   val unigramMap = UnigramMap(unigramMapJson)
+
   val hTable = hTableConnect(hBaseConfFileName, table)
 
   def hTableConnect(hBaseConfFileName: String, table: String):HTable = {
@@ -136,48 +135,55 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
     new HTable(config, table)
   }
 
-  // def merge(ss: Vector[Stream[Row]]): Stream[Row] =
-  //   ss map {case (s #:: ssTail) }
+  // def toHex(buf: Array[Byte]): String =
+  //   buf.map("\\%02X" format _).mkString
 
-  //   }
 
-  //   (ls, rs) match {
-  //   case (Stream.Empty, _) => rs
-  //   case (_, Stream.Empty) => ls
-  //   case (l #:: ls1, r #:: rs1) =>
-  //     if (l > r) l #:: merge(ls1, rs)
-  //     else r #:: merge(ls, rs1)
-  // }
-
-  def toHex(buf: Array[Byte]): String =
-    buf.map("\\%02X" format _).mkString
-
-  def buildScanner(linggleQuery: LinggleQuery): ResultScanner = {
-
-    val LinggleQuery(terms, length, positions, filters) = linggleQuery
-    val column = s"${length}-${positions.mkString}"
-    val columnBytes = column.getBytes
+  def buildScanner(terms: Vector[String], columnBytes: Array[Byte] ): ResultScanner = {
     val startRow = (terms
       map (t => Bytes.toBytes(unigramMap(t)))) reduce {_++_}
     val stopRow: Array[Byte] = startRow.init :+ (startRow.last + 1).toByte
-    println(linggleQuery)
-    println(toHex(startRow), toHex(stopRow), column)
-    
     val scan = new Scan(startRow, stopRow)
+    // val scan = new Scan(startRow)
+    scan.setSmall(true)
+    scan.setBatch(100)
+    scan.setCacheBlocks(false)
+    scan.setMaxVersions(1)
+    // scan.setMaxResultSize(100)
+    scan.setCaching(500)
+    scan.setCacheBlocks(true)
+    scan.setFilter(new PageFilter(100));
+    // scan.setAttribute(Scan.HINT_LOOKAHEAD, Bytes.toBytes(5));
+
+    // scan.setMaxResultsPerColumnFamily(100)
+
+
     scan.addColumn("sel".getBytes, columnBytes)
-    // scan.addFamily
     hTable.getScanner(scan)
+  }
+
+  def timeit[T](run : () => T): T = {
+    def t = System.currentTimeMillis
+    val t1 = t
+    val ret = run()
+    println(t - t1)
+    ret
+  }
+
+  def timeitScan(linggleQuery: LinggleQuery): Stream[Row] = {
+    timeit(() => scan(linggleQuery))
   }
 
   def scan(linggleQuery: LinggleQuery): Stream[Row] = {
     println(s"scan: $linggleQuery")
+    
     val LinggleQuery(terms, length, positions, filters) = linggleQuery
     val column = s"${length}-${positions.mkString}"
     val columnBytes = column.getBytes
 
-    val scanner =  buildScanner(linggleQuery)
+    val scanner =  buildScanner(terms, columnBytes)
 
-    def resultToRow(result: Result): Row ={
+    def resultToRow(result: Result): Row = {
       val value = new String(result.getValue("sel".getBytes, columnBytes))
       val Array(_ngram, _count) = value.split("\t")
       val count = _count.toInt
@@ -185,22 +191,39 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
       Row(ngram, count, positions)
     }
       
-    def scanToStream(scanner: ResultScanner): Stream[Row] = {
-      val rows = (scanner.next(10) map resultToRow)
-      if (rows.size < 10) 
-        rows.toStream
-      else
-        rows.toStream #::: scanToStream(scanner)
-    }
+    // def scanToStream(scanner: ResultScanner): Stream[Row] = {
+    //   val rows = (scanner.next(100) map resultToRow)
+    //   if (rows.size < 100)
+    //   {
+    //     try
+    //       rows.toStream
+    //     finally
+    //       scanner.close()
+    //   }
+    //   else
+    //     rows.toStream #::: scanToStream(scanner)
+    // }
 
-    scanToStream(scanner) 
-    // (scanner.next(100) map resultToRow ).toList
+    // scanToStream(scanner) 
+    val s = (scanner.next(100) map resultToRow ).toStream
+    scanner.close()
+    s
   }
+
+  // def merge(ss: List[Stream[Row]] ): Stream[Row] = {
+  //   val head #:: tail = s0
+  //   head #:: merge(List(tail, s1, s2, s3, s4))
+  //   unfold(ss)(f) //f: List[Stream[Row]] -> (Row, List[Stream[Row]])
+  //   val ones : Stream[Int] = 1 #:: ones
+  //   val nats = 0 #:: nats zipWith (+) ones
+  // }
   
   def rowFilter(lq: LinggleQuery)(row :Row) : Boolean = {
-    val posTagTrans = Map( "n." -> "n", "v." -> "v", "det." -> "d", "prep." -> "p", "adj." -> "a")
+    val posTagTrans = Map( "n." -> "n", "v." -> "v", "det." -> "d", "prep." -> "p", "adj." -> "a", "adv." -> "r")
     lq.filters forall { case (position, posTag) => posMap(row.ngram(position), posTagTrans(posTag)) } 
   }
+
+  
 
   def query(q: String): List[Row] = {
     val lqs: List[LinggleQuery] = LinggleQuery.parse(q).get
@@ -209,10 +232,9 @@ class Linggle(hBaseConfFileName: String, table: String, unigramMapJson: String) 
       row <- scan(lq) take 100
       if rowFilter(lq)(row)
     } yield row
-    rows.sorted.toList
+    rows.sorted.toList     // TODO: merge sort
   }
 }
-
 
 
 object Tester {
