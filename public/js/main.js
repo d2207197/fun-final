@@ -134,13 +134,16 @@ function events()
 		}
 		else if (e.keyCode == 8)
 		{
-			EXAMPLE_STATE = 'on';
-			exampleHandler(EXAMPLE_STATE);
+			// EXAMPLE_STATE = 'on';
+			// exampleHandler(EXAMPLE_STATE);
+                    			$("#search-button").click(); // trigger search event
 		}
 		else{
 			// input any character, close example
-			EXAMPLE_STATE = 'off';
-			exampleHandler(EXAMPLE_STATE);
+			// EXAMPLE_STATE = 'off';
+		    // exampleHandler(EXAMPLE_STATE);
+                    			$("#search-button").click(); // trigger search event
+
 		}
 		inputEmpty();
 

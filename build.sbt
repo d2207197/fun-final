@@ -19,11 +19,27 @@ libraryDependencies ++= Seq(
 
 resolvers += "Maven Central Server" at "http://repo1.maven.org/maven2"
 
-libraryDependencies += "org.apache.hbase" % "hbase" % "0.94.18"
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-core" % "1.2.1"
+resolvers += "cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "1.2.1"
+// libraryDependencies += "org.apache.hbase" % "hbase" % "0.94.18"
+
+// libraryDependencies += "org.apache.hadoop" % "hadoop-core" % "1.2.1"
+
+// libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "1.2.1"
+
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.3.0-cdh5.0.1" 
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-hdfs" % "2.3.0-cdh5.0.1" 
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.3.0-cdh5.0.1" 
+
+libraryDependencies += "org.apache.hbase" % "hbase-client" % "0.96.1.1-cdh5.0.2"
+
+libraryDependencies += "org.apache.hbase" % "hbase-common" % "0.96.1.1-cdh5.0.2"
+
+
 
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.4.0"
 

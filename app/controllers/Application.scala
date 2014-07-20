@@ -6,13 +6,13 @@ import cc.nlplab._
 import play.api.libs.json._
 
 object Application extends Controller {
+  val lgl =new Linggle("hbase-site.xml", "linggle-web1t")
 
   def index = Action {
     Ok(views.html.index("hi"))
   }
 
   def query(q: String) = Action {
-    val lgl =new Linggle("hbase-site.xml", "web1t-linggle", "web1t_unigrams_300000up.json")
 
     var result =lgl.query(q) 
     var s = (for(r <- result) yield r.count).sum
